@@ -17,25 +17,25 @@ void loop()
   digitalWrite (green,LOW) ;
   digitalWrite (red,LOW);
   digitalWrite (blue,LOW);
-  delay (100) ;
+  delay (1000) ;
   
   digitalWrite (yellow,LOW);
   digitalWrite (green,HIGH) ;
   digitalWrite (red,LOW);
   digitalWrite (blue,LOW);
-  delay (100) ;
+  delay (1000) ;
   
   digitalWrite (yellow,LOW);
   digitalWrite (green,LOW) ;
   digitalWrite (red,HIGH);
   digitalWrite (blue,LOW);
-  delay (100) ;
+  delay (1000) ;
 
   digitalWrite (yellow,LOW);
   digitalWrite (green,LOW) ;
   digitalWrite (red,LOW);
   digitalWrite (blue,HIGH);
-  delay (100) ;
+  delay (1000) ;
 
  
   
@@ -43,12 +43,12 @@ void loop()
   digitalWrite (green,LOW) ;
   digitalWrite (red,HIGH);
   digitalWrite (blue,LOW);
-  delay (100) ;
+  delay (1000) ;
 
     digitalWrite (yellow,LOW);
   digitalWrite (green,HIGH) ;
   digitalWrite (red,LOW);
   digitalWrite (blue,LOW);
-  delay (100) ;
+  delay (1000) ;
   
 }
