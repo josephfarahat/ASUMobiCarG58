@@ -1,0 +1,403 @@
+#define HC06          //uncomment this for HC-06 BT module
+
+#include <SoftwareSerial.h>
+SoftwareSerial BtSerial(10, 11);   // RX on Arduino to TX of the module, TX on Arduino to RX of the module - init the software serial lib
+const char CR = 13;                //ascii(13)= /r
+const char LF = 10;                //ascii(10)= /n
+const char TxEnd[2] = {13,10};     //terminator for arduino to PC or bluetooth strings transmission
+//Motors
+const byte BACK=0;
+const byte FORW=1;
+const byte LEFT=2;
+const byte RIGHT=3;
+const byte STOP=4;
+const byte BRAKE=5;
+//Keys
+const byte KEYS_OFF=0;
+const byte KEY1_ON=1;
+const byte KEY2_ON=2;
+const byte KEY3_ON=3;
+
+String   ATmode = "AT";
+String   Device = "ArduinoRover";   //board name
+boolean  Echo = false;              //enable-disable echo mode of usb data
+String   RcvUsb;                    //received string from USB
+byte     BtBuffer[6];               //Bt receive buffer
+byte     Buffer[15];                //aux Bt buffer
+byte     Pointer=0;
+String   LastMessage;               //last message sent over bluetooth
+//pins
+int      pinIN1=2;                  //Low = DX motor back, output
+int      pinIN2=3;                  //Low = DX motor Forw, output
+int      pinENA=5;                  //PWM speed, DX motor, output PWM
+int      pinIN3=4;                  //Low = SX motor back, output
+int      pinIN4=7;                  //Low = SX motor Forw, output
+int      pinENB=6;                  //PWM speed, SX motor, output PWM
+int      pinLed=13;                 //Onboard led, output
+//other
+byte     SxSpeed=0;
+//byte     SxAccel=0;
+byte     DxSpeed=0;
+//byte     DxAccel=0;
+byte     Trigger=10;                //minimum value from remote control required to operate, do not set to 0
+//Fail safe timer
+unsigned long SafeTime=1500;        //fail safe timer, if no data arrives the rover will stop after SafeTime, just in case the connection drops
+unsigned long LastTime=0;           //used with SafeTime
+//message to I-Racer advanced remote controller app
+unsigned long MsgTime=1000;         //time between messages in milliseconds, do not set under 1000
+unsigned long LastMsg=0;            //used with MsgTime
+String   RoverMsg;                  //the message that will be sent to the remote control app every MsgTime milliseconds
+boolean  BtReady;                   //Flag, false=no BT connection, true= BT connected
+
+
+void setup()
+{
+  //setup pins
+  pinMode(pinLed,OUTPUT);
+  digitalWrite(pinLed,LOW);
+  pinMode(pinIN1,OUTPUT);
+  pinMode(pinIN2,OUTPUT);
+  pinMode(pinIN3,OUTPUT);
+  pinMode(pinIN4,OUTPUT);
+  pinMode(pinENA,OUTPUT);
+  pinMode(pinENA,OUTPUT);
+  digitalWrite(pinIN1,HIGH);    //stop motors
+  digitalWrite(pinIN2,HIGH);
+  digitalWrite(pinIN3,HIGH);
+  digitalWrite(pinIN4,HIGH);
+  analogWrite(pinENA,0);        //no PWM to motors
+  analogWrite(pinENB,0);
+  
+  //Open USB communication
+  Serial.begin(115200);              // usb data rate, remember to use the same baud rate on serial monitor when debugging
+  
+  //Open Bluetooth communication, the data rate MUST match your module setting (usually 9600bps on a new module)
+  #ifdef HC06
+    //If you get trouble try change this setting, also try to send AT from the serial monitor to see if the BT module answers
+    BtSerial.begin(9600);             // bluetooth module data rate, usually 9600bps for a new 'out of the box' module
+  #endif
+
+  #ifdef HC05
+    //If you get trouble try change this setting, also try to send AT from the serial monitor to see if the BT module answers
+    BtSerial.begin(38400);             // bluetooth module data rate, it is 38400bps after issuing the AT+ORGL command!
+  #endif
+  
+  BtReady=false; 
+  
+}
+
+void loop() // run over and over
+{
+  if (BtSerial.available()) {                         //almost 7 bytes received                   
+    if (getReceivedBytes()==true) {
+      //Received data is OK!
+      LastTime=millis();                                //Reload failSafe timer
+      BtReady=true;                                     //BT connection is ready
+      
+      //received bytes explanation:
+      //byte 0: Function keys values
+      //byte 1: horizontal slider value,
+      //byte 2: horizontal acceleration value, NOT used in this sketch
+      //byte 3: vertical slider value,
+      //byte 4: vertical   acceleration value, NOT used in this sketch
+      //byte 5: always 0xFF (transmission terminator check)
+      //byte 6: received CRC8 from remote control app
+      if (BtBuffer[1]==100 && BtBuffer[3]==100) {
+        //stop
+        setMotors(LEFT,STOP);
+        setMotors(RIGHT,STOP);
+        analogWrite(pinENA,0);
+        analogWrite(pinENB,0);
+        digitalWrite(pinLed,LOW);
+        RoverMsg=("Rover: Stop!");  //set the string for the app
+        }
+      if (BtBuffer[3]>100+Trigger) {
+        //back mode
+        setMotors(LEFT,BACK);
+        setMotors(RIGHT,BACK);
+        SxSpeed=map(BtBuffer[3],0,100, 0, 255); //map from 0 to 100
+        DxSpeed=SxSpeed;
+        analogWrite(pinENA,DxSpeed);
+        analogWrite(pinENB,SxSpeed);
+        digitalWrite(pinLed,HIGH);
+        RoverMsg=("Rover: Back");   //set the string for the app
+        //Serial.println(SxSpeed,DEC);  //debug
+      } 
+     if (BtBuffer[3]<100-Trigger) {
+        //forw mode
+        setMotors(LEFT,FORW);
+        setMotors(RIGHT,FORW);
+        SxSpeed=map(BtBuffer[3],100,0, 0, 255); //map from 100 to 0
+        DxSpeed=SxSpeed;
+        analogWrite(pinENA,DxSpeed);
+        analogWrite(pinENB,SxSpeed);
+        digitalWrite(pinLed,HIGH);
+        RoverMsg=("Rover: Forw");   //set the string for the app
+        //Serial.println(SxSpeed,DEC);  //debug
+      }
+     if (BtBuffer[1]>100+Trigger) {
+        //Steer right
+        setMotors(LEFT,FORW);
+        setMotors(RIGHT,BACK);
+        SxSpeed=map(BtBuffer[1],0,100, 0, 255); //map from 0 to 100
+        DxSpeed=SxSpeed;
+        analogWrite(pinENA,DxSpeed);
+        analogWrite(pinENB,SxSpeed);
+        digitalWrite(pinLed,HIGH);
+        RoverMsg=("Rover: Right");   //set the string for the app
+        //Serial.println(SxSpeed,DEC);   //debug
+      } 
+     if (BtBuffer[1]<100-Trigger) {
+        //Steer left
+        setMotors(LEFT,BACK);
+        setMotors(RIGHT,FORW);
+        SxSpeed=map(BtBuffer[1],100,0, 0, 255); //map from 100 to 0
+        DxSpeed=SxSpeed;
+        analogWrite(pinENA,DxSpeed);
+        analogWrite(pinENB,SxSpeed);
+        digitalWrite(pinLed,HIGH);
+        RoverMsg=("Rover: Left");         //set the string for the app
+        //Serial.println(SxSpeed,DEC);   //debug
+      } 
+     switch (BtBuffer[0]) {
+       //check for function keys pressed
+      case KEYS_OFF:
+        //do what you want when the functions keys are released
+        //don't send messages to the app when keys are off
+        //Serial.println("Keys released");  //debug
+        break;
+      case KEY1_ON:
+        //do what you want when the function key1 is pressed
+        RoverMsg=("Rover: F1");   //set the string for the app
+        //Serial.println("Key1 on");    //debug
+        break;
+      case KEY2_ON:
+        //do what you want when the function key2 is pressed
+        RoverMsg=("Rover: F2");   //set the string for the app
+        //Serial.println("Key2 on");     //debug
+        break;
+      case KEY3_ON:
+        //do what you want when the function key3 is pressed 
+        RoverMsg=("Rover: F3");   //set the string for the app
+        //Serial.println("Key3 on");    //debug
+        break;  
+      default:
+        //not used
+        break;
+      }              
+    }
+  }
+  
+  //check for safe timer
+  if(millis() - LastTime >= SafeTime) {
+      //receive timeout, stop the rover
+      setMotors(LEFT,STOP);
+      setMotors(RIGHT,STOP);
+      analogWrite(pinENA,0);
+      analogWrite(pinENB,0);
+      digitalWrite(pinLed,LOW);
+      BtReady=false;                          //BT connection lost/not responding
+      //Serial.println("Stop for timeout");   //debug
+  }
+  
+  //send messages to the app
+  if(millis() - LastMsg >= MsgTime) {
+    LastMsg=millis();
+    if (BtReady==true) {
+      BtSerialprint(RoverMsg);
+    } 
+  } 
+  
+  //check for data over USB
+  if (Serial.available())
+  {
+    RcvUsb = ReadUsbBuffer(Echo);
+    //do usb commands
+    if (RcvUsb.startsWith("Echo")) {
+      //Echo on Echo off mode
+      UsbEchoMode(RcvUsb);
+    }
+    if (RcvUsb == ("Device")) {
+      //Send the description of the connected device
+      Serialprint(Device,true);
+    }
+    if (RcvUsb.startsWith(ATmode)) {
+      //AT mode, send commands to the Bt module
+      //RcvUsb.toUpperCase();
+      UsbSendAtMode(RcvUsb);
+    }
+  }
+}
+
+//Set the motors on or off and direction
+void setMotors(byte Side, byte Direction) {
+  if (Side==LEFT) {
+    //left side motors
+    switch (Direction) {
+      case FORW:
+        digitalWrite(pinIN3,HIGH);
+        digitalWrite(pinIN4,LOW);
+        break;
+      case BACK:
+        digitalWrite(pinIN3,LOW);
+        digitalWrite(pinIN4,HIGH);
+        break;
+      case STOP:
+        //free wheel
+        digitalWrite(pinIN3,HIGH);
+        digitalWrite(pinIN4,HIGH);
+        break;
+      default:
+        //not used
+        break;
+    } 
+  } 
+  if (Side==RIGHT) {
+    //right side motors
+    switch (Direction) {
+      case FORW:
+        digitalWrite(pinIN1,HIGH);
+        digitalWrite(pinIN2,LOW);
+        break;
+      case BACK:
+        digitalWrite(pinIN1,LOW);
+        digitalWrite(pinIN2,HIGH);
+        break;
+      case STOP:
+        //free wheel
+        digitalWrite(pinIN1,HIGH);
+        digitalWrite(pinIN2,HIGH);
+        break;
+      default:
+        //not used
+        break;
+    } 
+  }    
+}
+
+//get data from serial bluetooth
+//data must End with 0xFF
+//data Is: Function, servo1 pos, speed1, servo2 pos, speed2, 0xFF, CRC8
+boolean getReceivedBytes() {
+  
+  //read 7 bytes from serial
+  Buffer[Pointer]=BtSerial.read();
+  
+  if (Pointer>=6 && Buffer[Pointer-1] == 0xFF)  {
+   BtBuffer[6]=Buffer[Pointer];
+   BtBuffer[5]=Buffer[Pointer-1];
+   BtBuffer[4]=Buffer[Pointer-2];
+   BtBuffer[3]=Buffer[Pointer-3];
+   BtBuffer[2]=Buffer[Pointer-4];
+   BtBuffer[1]=Buffer[Pointer-5];
+   BtBuffer[0]=Buffer[Pointer-6];
+   Pointer=0;
+   //Print data for debug...                               
+   for (int i = 0; i < 6; i++)                      //data byte 6 is CRC8
+    {
+      Serialprint(String(BtBuffer[i],DEC),false);
+      Serialprint("\t",false);
+    }
+    Serialprint(String(BtBuffer[6],HEX),false);                 //print the received CRC8 in Hex format
+    Serialprint("\t",false);
+  
+   //check data integrity:  CRC8
+   if (BtBuffer[6]==CRC8(BtBuffer,6))  { 
+      //good reception
+      Serialprint("CRC is OK",true);  
+      return true;
+   } else  {
+      //no good, discard data
+      Serialprint("CRC bad",true);  
+      return false;
+   }  
+    
+  }else{
+    Pointer= (Pointer+1) % 10;            //keep the pointer into buffer size
+    return false;
+  }
+}
+
+//Receive data from usb, must end with LF !
+// if echo mode is true then print data back to usb
+String ReadUsbBuffer(boolean Echo) {
+  String Received;
+  Received = Serial.readStringUntil(LF);
+  Serialprint("You sent: ",true);
+  Serialprint(Received,true);
+  return Received;
+}
+
+//set the usb echo mode
+void UsbEchoMode( String Received) {
+  if (Received.endsWith("off")) {
+    Echo = false;
+  } else  {
+    Echo = true;
+    Serialprint(Received,true);
+    Serialprint("Echo is on",true);
+  }
+}
+
+//Send AT commands to the module, wait for response and print back to USB
+//This function is timed-out, the BT module can take more than 500msec to answer
+void UsbSendAtMode( String Received) {
+  #ifdef HC05
+    //HC-05 module needs a terminator 
+    BtSerial.print(Received+"\r\n");
+  #endif
+
+  #ifdef HC06
+    //HC-06 module DOESN'T need a terminator 
+    BtSerial.print(Received);
+  #endif
+  
+  Received = BtSerial.readString();    //read until timeout
+  #ifdef HC05
+    Serialprint("HC-05> ",false);
+  #else
+    Serialprint("HC-06> ", false);
+  #endif
+  Serialprint(Received,true);
+}
+
+
+//Send a serial string only if serial is available and Echo is on
+//also add a terminator (TxEnd) for future use
+void Serialprint( String Message, boolean Close) {
+   if (Echo==true) {
+    //Send the message over Serial monitor 
+    Serial.print(Message);
+    if (Close==true)  {
+      Serial.print( TxEnd);
+    }
+  }  
+}  
+
+//Send strings over bluetooth
+void BtSerialprint( String Message) {
+  //send only new messages to not overload bluetooth device/buffer/serial...
+  if (Message==LastMessage) {
+    return;
+  } else {
+    LastMessage=Message;
+    BtSerial.print(Message + TxEnd); 
+  }
+}
+
+
+byte CRC8(const byte *data, byte len) {
+  byte crc = 0x00;
+  while (len--) {
+    byte extract = *data++;
+    for (byte tempI = 8; tempI; tempI--) {
+      byte sum = (crc ^ extract) & 0x01;
+      crc >>= 1;
+      if (sum) {
+        crc ^= 0x8C;
+      }
+      extract >>= 1;
+    }
+  }
+  return crc;
+}
