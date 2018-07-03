@@ -1,0 +1,11 @@
+Note that one side of the optical sensor holds s a light emitting diode, and a photo transistor on the other side.
+If the visual path is not blocked, phototransistor would conduct,
+but when something blocked the light falling on the photo transistor it wouldn’t conduct.
+So an encoder disc (with a proper encoder resolution) can be placed in the slot of the optical sensor to count rotation rate of a connected wheel.
+The encoder disc (also known as index wheel)  have multiple slots/holes. 
+You can easily fabricate your own encoder disk from a sheet of stainless steel or hard plastic. 
+If you are interested only in speed sensing (not position sensing) application , one set of slots is sufficient for the task.
+Our disk has 12 slots.
+Diameter of the wheel is 20.4 cm
+Each revolution of the wheel is equivalent to 12 interruptions.
+Each interuption signifies a motion of 1.7 cm which is also the resolution of our accurate movement. 
