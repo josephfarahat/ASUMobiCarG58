@@ -1,0 +1,129 @@
+const int photopin = 2;
+int counter = 0,z=0;
+float tick = 4;
+int tickgoal;
+float tickgoal2;
+float error ;
+float accurate ;
+void distance_acc(int distance);
+void angle_acc( int angle );
+int x;
+int y;
+int g=1;
+int k=1;
+void setup() {
+  // put your setup code here, to run once:
+  pinMode(13,OUTPUT);
+ pinMode(12,OUTPUT);
+ pinMode(8,OUTPUT);
+ pinMode(3,OUTPUT);
+ pinMode(5,OUTPUT);
+ pinMode(photopin,INPUT);
+ Serial.begin(9600);
+ pinMode(7,OUTPUT);
+
+}
+
+void loop() {
+  // put your main code here, to run repeatedly:
+  char data = Serial.read();
+  if ( data == 'W')
+  { 
+    for(int i=0; i<4; i++)
+    {
+  distance_acc(40);
+    digitalWrite(12,0);
+  analogWrite(3,0);
+  digitalWrite(8,0);
+  digitalWrite(7,0);
+  analogWrite(5,0);
+  delay(1000);
+  g=1;
+  angle_acc(90);
+  digitalWrite(12,0);
+  analogWrite(3,0);
+  digitalWrite(8,0);
+  digitalWrite(7,0);
+  analogWrite(5,0);
+  delay(1000);
+  k=1;
+    }
+  }
+  
+
+}
+
+void distance_acc(int distance)
+{ 
+while( g!=0)
+{
+  Serial.println(counter);
+  error = distance*0.002;
+  accurate = (1-error)*distance;
+   int qq;
+   qq = digitalRead(photopin);
+  if( qq == 0)
+{
+int  z=qq;
+  if (z=!0)
+  {
+   counter++;
+  }
+
+}
+  
+  digitalWrite(13,0);
+  digitalWrite(12,1);
+  analogWrite(3,103);
+  digitalWrite(8,1);
+  digitalWrite(7,0);
+  analogWrite(5,110);
+  if(distance>40)
+  {
+    
+  
+tickgoal= tick*accurate ;
+  }
+  else
+  tickgoal=tick*distance;
+
+if( counter == tickgoal)
+{
+  g=0;
+  counter=0;
+}
+
+}
+}
+void angle_acc( int angle )
+
+{
+  while(k!=0)
+  {
+    Serial.println(counter);
+    tickgoal2 = angle * tick* 0.339;
+  digitalWrite(13,0);
+  digitalWrite(12,1);
+  analogWrite(3,130);
+  digitalWrite(8,0);
+  digitalWrite(7,1);
+  analogWrite(5,100);
+  int qq;
+ qq = digitalRead(photopin);
+    if( qq == 0)
+{
+int  z=qq;
+  if (z=!0)
+  {
+   counter++;
+  }
+}
+if( counter > tickgoal2)
+{
+  k=0;
+  counter=0;
+}
+
+}
+
+}
