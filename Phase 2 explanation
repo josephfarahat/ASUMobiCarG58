@@ -1,0 +1,9 @@
+Phase two
+Components :
+3 IR sensors.
+Basic idea :
+Each IR sensor detects white and black colors.
+One sensor is on the left one on the right and one centered.
+If the left(right) sensor detects a black line the car turn to the left(right).
+If the three sensors detect a black line the car continues in the same state as before. 
+This idea is used to make a line tracking vehicle .
