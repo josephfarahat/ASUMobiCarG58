@@ -1,0 +1,16 @@
+Phase 1
+Components:
+1-	Full car kit 
+2-	H-Bridge
+3-	Arduino 
+4-	Bluetooth module 
+5-	Ultrasonic sensor
+6-	Three batteries  
+Part 1
+Explanation:
+By using Bluetooth module we connect it with the mobile application to control the car using the mobile application, we can make the car moves forward, backward, right and left.
+Connections: 
+H-Bridge is connected with the Arduino and the motors of the wheels, we create the code in the Arduino program and uploaded it on the microprocessor of the Arduino, the code is the software part which is responsible for the method of moving the car, the batteries supported the car by power
+Part two of the first phase  (obstacle avoidance):
+The ultrasonic sensor sends the distance between it and any reflective objective of sonar waves. With internal calculations of the time taken between the trigger wave and the echo we can get the distance.
+We programmed the Arduino the give 0 voltage to the wheels in case of finding an obstacle near the car by 25cm.
